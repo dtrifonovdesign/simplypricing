@@ -6,17 +6,19 @@ const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 const PACKAGES = new Set(['essentials', 'complete', 'signature', 'brand']);
 
 // state lives in the URL hash so a quote can be shared as a link
-const state = { build: 'complete', rounds: 0, pages: 0, threeD: false, care: 'none' };
+const state = { build: 'complete', rounds: 0, pages: 0, threeD: false, admin: false, store: false, care: 'none' };
 const readHash = () => {
   const p = new URLSearchParams(location.hash.slice(1));
   if (BUILDS.some((b) => b.id === p.get('b'))) state.build = p.get('b');
   state.rounds = clamp(+p.get('r') || 0, 0, 10);
   state.pages = clamp(+p.get('p') || 0, 0, 20);
   state.threeD = p.get('d') === '1';
+  state.admin = p.get('m') === '1';
+  state.store = p.get('s') === '1';
   if (CARE.some((c) => c.id === p.get('c'))) state.care = p.get('c');
 };
 const writeHash = () => {
-  const p = new URLSearchParams({ b: state.build, r: state.rounds, p: state.pages, d: +state.threeD, c: state.care });
+  const p = new URLSearchParams({ b: state.build, r: state.rounds, p: state.pages, d: +state.threeD, m: +state.admin, s: +state.store, c: state.care });
   history.replaceState(null, '', '#' + p);
 };
 
@@ -63,7 +65,9 @@ const addonsEl = $('#addons');
 addonsEl.innerHTML = `
   <div class="row" id="row-round"><div><b>${ADDONS.round.name}</b><small id="s-round"></small></div><div class="step" data-k="rounds"><button type="button" aria-label="Fewer rounds" data-d="-1">−</button><output>0</output><button type="button" aria-label="More rounds" data-d="1">+</button></div></div>
   <div class="row" id="row-page"><div><b>${ADDONS.page.name}</b><small id="s-page"></small></div><div class="step" data-k="pages"><button type="button" aria-label="Fewer pages" data-d="-1">−</button><output>0</output><button type="button" aria-label="More pages" data-d="1">+</button></div></div>
-  <div class="row" id="row-3d"><div><b>${ADDONS.threeD.name}</b><small>Scroll-driven 3D or an interactive hero, like simplybydaniel.com. +${money(ADDONS.threeD.price)}</small></div><button class="tog" type="button" role="switch" aria-label="${ADDONS.threeD.name}" data-k="threeD" aria-checked="false"></button></div>`;
+  <div class="row" id="row-3d"><div><b>${ADDONS.threeD.name}</b><small>Scroll-driven 3D or an interactive hero, like simplybydaniel.com. +${money(ADDONS.threeD.price)}</small></div><button class="tog" type="button" role="switch" aria-label="${ADDONS.threeD.name}" data-k="threeD" aria-checked="false"></button></div>
+  <div class="row" id="row-admin"><div><b>${ADDONS.admin.name}</b><small>A private page to log in and edit the site's details. +${money(ADDONS.admin.price)}</small></div><button class="tog" type="button" role="switch" aria-label="${ADDONS.admin.name}" data-k="admin" aria-checked="false"></button></div>
+  <div class="row" id="row-store"><div><b>${ADDONS.store.name}</b><small>Sell products and take payments on the site. +${money(ADDONS.store.price)}</small></div><button class="tog" type="button" role="switch" aria-label="${ADDONS.store.name}" data-k="store" aria-checked="false"></button></div>`;
 addonsEl.addEventListener('click', (e) => {
   const st = e.target.closest('.step button');
   if (st) { const k = st.parentElement.dataset.k; state[k] = clamp(state[k] + +st.dataset.d, 0, k === 'rounds' ? 10 : 20); return render(); }
@@ -85,6 +89,8 @@ function quote() {
   if (PACKAGES.has(b.id) && state.rounds) add(`${state.rounds} extra round${state.rounds > 1 ? 's' : ''}`, state.rounds * ADDONS.round.price);
   if (b.pages && state.pages) add(`${state.pages} extra page${state.pages > 1 ? 's' : ''}`, state.pages * ADDONS.page.price);
   if (b.pages && state.threeD) add(ADDONS.threeD.name, ADDONS.threeD.price);
+  if (b.pages && state.admin) add(ADDONS.admin.name, ADDONS.admin.price);
+  if (b.pages && state.store) add(ADDONS.store.name, ADDONS.store.price);
   const care = CARE.find((c) => c.id === state.care);
   return { b, lines, total, care };
 }
@@ -93,7 +99,7 @@ function render() {
   const b = build();
   // reset add-ons that don't apply to the chosen build
   if (!PACKAGES.has(b.id)) { state.rounds = 0; }
-  if (!b.pages) { state.pages = 0; state.threeD = false; }
+  if (!b.pages) { state.pages = 0; state.threeD = false; state.admin = false; state.store = false; }
 
   buildsEl.querySelectorAll('.build').forEach((el) => { const on = el.dataset.id === state.build, p = el.querySelector('.build__pick'); el.classList.toggle('is-on', on); p.setAttribute('aria-checked', on); p.tabIndex = on ? 0 : -1; });
   careEl.querySelectorAll('.chip').forEach((el) => { el.setAttribute('aria-checked', el.dataset.id === state.care); el.tabIndex = el.dataset.id === state.care ? 0 : -1; });
@@ -101,6 +107,8 @@ function render() {
   $('#row-round').hidden = !PACKAGES.has(b.id);
   $('#row-page').hidden = !b.pages;
   $('#row-3d').hidden = !b.pages;
+  $('#row-admin').hidden = !b.pages;
+  $('#row-store').hidden = !b.pages;
   $('#s-round').textContent = `${money(ADDONS.round.price)} each. ${b.rounds} included.`;
   $('#s-page').textContent = `${money(ADDONS.page.price)} each, past the ${b.pages} included.`;
   addonsEl.querySelector('[data-k="rounds"] output').textContent = state.rounds;
