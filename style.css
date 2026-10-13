@@ -100,11 +100,25 @@ section > h1 + *, section > h2 + * { margin-top: 20px; }
 .foot { padding-bottom: 40px; font-size: .8125rem; color: var(--stone); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.printhead { display: none; }
 @media print {
-  body { background: #fff; }
-  .top__tag, .acts, .fine, .foot, #sec-add .step button { display: none; }
-  .grid { display: block; } .sum { position: static; background: #fff; color: #000; border: 1px solid #000; }
-  .sum h2, .total, .lines li span:last-child { color: #000; }
+  @page { margin: 18mm; }
+  body, .gate { background: #fff !important; }
+  .gate, .top, .steps, .foot, .acts, .fine { display: none !important; }
+  .grid { display: block; padding: 0; }
+  .wrap { width: 100%; }
+  .sum { position: static; padding: 0; background: #fff; color: #000; border-radius: 0; }
+  .printhead { display: block; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 2px solid #000; }
+  .printhead b { display: block; font: 700 1.5rem/1.2 "Fraunces", Georgia, serif; color: #000; }
+  .printhead span { font-size: .875rem; color: #444; }
+  .sum h2 { display: none; }
+  .lines { font-size: 1rem; gap: 8px; }
+  .lines li { padding-bottom: 8px; border-bottom: 1px solid #ccc; }
+  .lines li span, .lines li span:last-child { color: #000; }
+  .lines .credit span:last-child { color: #000; }
+  .total, .total b, .total--rec b { color: #000; border-color: #000; }
+  .total--rec { border: 0; }
+  .meta { color: #333; margin-top: 16px; }
 }
 
 /* PIN gate */

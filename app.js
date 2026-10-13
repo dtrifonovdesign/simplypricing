@@ -149,5 +149,6 @@ $('#copy').addEventListener('click', () => {
 });
 $('#link').addEventListener('click', () => copy(location.href, 'Link copied.'));
 
+$('#print-date').textContent = 'Quote, ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 readHash();
 render();
