@@ -1,4 +1,4 @@
-const { BUILDS, ADDONS, CARE } = globalThis.__cfg;
+const { BUILDS, ADDONS, CARE, PROCESS } = globalThis.__cfg;
 
 const $ = (s) => document.querySelector(s);
 const money = (n) => '$' + Math.round(n).toLocaleString('en-US');
@@ -35,18 +35,21 @@ const card = (b) => `
       <span class="build__price">${money(b.price)}</span>
       <span class="build__blurb">${b.blurb}</span>
     </button>
-    <button class="build__more" type="button" aria-expanded="false" aria-controls="inc-${b.id}">See more</button>
+    <div class="build__links"><button class="build__more" type="button" aria-expanded="false" aria-controls="inc-${b.id}">See more</button>
+    ${PROCESS[b.id] ? `<button class="build__more build__proc" type="button" data-proc="${b.id}">See the process</button>` : ''}</div>
     <ul id="inc-${b.id}" hidden>${b.items.map((i) => `<li>${i}</li>`).join('')}</ul>
   </div>`;
 buildsEl.innerHTML = `<div class="builds__main">${BUILDS.filter((b) => b.main).map(card).join('')}</div>
   <p class="smalllabel">Or something smaller</p>
   <div class="builds__small">${BUILDS.filter((b) => !b.main).map(card).join('')}</div>`;
 buildsEl.addEventListener('click', (e) => {
+  const pr = e.target.closest('[data-proc]');
+  if (pr) return openProcess(pr.dataset.proc, pr);
   const more = e.target.closest('.build__more');
   if (more) {
     const open = more.getAttribute('aria-expanded') !== 'true';
     more.setAttribute('aria-expanded', open); more.textContent = open ? 'See less' : 'See more';
-    more.nextElementSibling.hidden = !open;
+    $('#inc-' + more.closest('.build').dataset.id).hidden = !open;
     return;
   }
   const el = e.target.closest('.build__pick'); if (!el) return;
@@ -59,6 +62,34 @@ buildsEl.addEventListener('keydown', (e) => {
   state.build = BUILDS[(i + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : n - 1)) % n].id;
   render(); buildsEl.querySelector(`.build__pick[data-id="${state.build}"]`).focus();
 });
+
+/* ---- process panel */
+const dlg = document.createElement('dialog');
+dlg.className = 'proc';
+dlg.setAttribute('aria-labelledby', 'proc-title');
+dlg.innerHTML = '<div class="proc__in"><button class="proc__x" type="button" aria-label="Close">×</button><p class="eyebrow" id="proc-eyebrow"></p><h2 id="proc-title"></h2><p class="proc__intro" id="proc-intro"></p><ol class="proc__list" id="proc-list"></ol><h3 class="proc__h">After launch</h3><ul class="proc__after" id="proc-after"></ul></div>';
+document.body.append(dlg);
+let procOpener = null;
+function openProcess(id, opener) {
+  const p = PROCESS[id], b = BUILDS.find((x) => x.id === id); if (!p) return;
+  procOpener = opener || null;
+  $('#proc-eyebrow').textContent = 'The process';
+  $('#proc-title').textContent = b.name;
+  $('#proc-intro').textContent = p.intro;
+  const li = (txt) => Object.assign(document.createElement('li'), { textContent: txt });
+  const list = $('#proc-list'); list.replaceChildren();
+  p.steps.forEach((s) => {
+    const el = document.createElement('li'), h = document.createElement('h3'), d = document.createElement('p');
+    h.textContent = s.t; d.textContent = s.d; el.append(h, d);
+    [['You get', s.gets], ['Done when', s.done]].forEach(([k, v]) => { if (!v) return; const m = document.createElement('p'); m.className = 'proc__m'; const bb = document.createElement('b'); bb.textContent = k + ': '; m.append(bb, v); el.append(m); });
+    list.append(el);
+  });
+  $('#proc-after').replaceChildren(...p.after.map(li));
+  dlg.showModal(); dlg.scrollTop = 0; dlg.querySelector('.proc__in').scrollTop = 0;
+}
+dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('.proc__x')) dlg.close(); });
+dlg.addEventListener('close', () => { if (procOpener) procOpener.focus(); });
+$('#proc-link').addEventListener('click', (e) => openProcess(state.build, e.currentTarget));
 
 /* ---- add-ons */
 const addonsEl = $('#addons');
@@ -124,6 +155,8 @@ function render() {
   $('#rec-row').hidden = !rec;
   if (rec) { $('#rec-label').textContent = `Then, per ${q.care.per}`; $('#rec').textContent = money(q.care.price); }
   $('#care-note').textContent = q.care.note;
+  $('#proc-link').hidden = !PROCESS[state.build];
+  $('#proc-link').textContent = 'See how ' + b.name + ' works';
 
   const meta = [];
   const rounds = b.rounds ? b.rounds + state.rounds : 0, pages = b.pages ? b.pages + state.pages : 0;
