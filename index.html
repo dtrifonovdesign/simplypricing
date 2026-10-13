@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Pricing calculator | Simply by Daniel</title>
+  <meta name="description" content="Build a quote with Simply by Daniel." />
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+  <meta name="googlebot" content="noindex, nofollow" />
+  <meta name="theme-color" content="#F4EEE3" />
+  <link rel="icon" href="/favicon.ico" sizes="48x48" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Bricolage+Grotesque:wght@500;600;700&family=Figtree:wght@400;500;600&display=swap" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body class="locked">
+  <div class="gate" id="gate">
+    <form class="gate__card" id="gate-form" novalidate>
+      <svg class="gate__mark" viewBox="0 0 100 100" aria-hidden="true"><path d="M48 10H75A5 5 0 0 1 80 15V41A5 5 0 0 1 75 46H48A18 18 0 0 1 48 10Z" fill="#1A1816"/><path d="M52 54H25A5 5 0 0 0 20 59V85A5 5 0 0 0 25 90H52A18 18 0 0 0 52 54Z" fill="#B8935A"/></svg>
+      <h1>Enter your PIN</h1>
+      <label class="gate__label" for="pin">PIN</label>
+      <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" required />
+      <button class="btn btn--primary" type="submit">Unlock</button>
+      <p class="gate__err" id="gate-err" role="alert"></p>
+    </form>
+  </div>
+  <header class="top">
+    <div class="wrap top__in">
+      <a class="logo" href="https://simplybydaniel.com/" aria-label="Simply by Daniel">
+        <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M48 10H75A5 5 0 0 1 80 15V41A5 5 0 0 1 75 46H48A18 18 0 0 1 48 10Z" fill="#1A1816"/><path d="M52 54H25A5 5 0 0 0 20 59V85A5 5 0 0 0 25 90H52A18 18 0 0 0 52 54Z" fill="#B8935A"/></svg>
+        <span>Simply</span>
+      </a>
+      <p class="top__tag">Pricing calculator</p>
+    </div>
+  </header>
+
+  <main class="wrap grid">
+    <div class="steps">
+      <section aria-labelledby="h-build">
+        <p class="eyebrow">1</p>
+        <h1 id="h-build">What are we making?</h1>
+        <div class="builds" id="builds" role="radiogroup" aria-labelledby="h-build"></div>
+      </section>
+
+      <section aria-labelledby="h-add" id="sec-add">
+        <p class="eyebrow">2</p>
+        <h2 id="h-add">Add-ons</h2>
+        <div class="rows" id="addons"></div>
+      </section>
+
+      <section aria-labelledby="h-care">
+        <p class="eyebrow">3</p>
+        <h2 id="h-care">After launch</h2>
+        <div class="chipset" id="care" role="radiogroup" aria-labelledby="h-care"></div>
+        <p class="note" id="care-note" aria-live="polite"></p>
+      </section>
+    </div>
+
+    <aside class="sum" aria-label="Your quote">
+      <h2>Your quote</h2>
+      <ul class="lines" id="lines" aria-live="polite"></ul>
+      <div class="total"><span>Today</span><b id="total">$0</b></div>
+      <div class="total total--rec" id="rec-row" hidden><span id="rec-label">Then</span><b id="rec">$0</b></div>
+      <div class="meta" id="meta"></div>
+      <div class="acts">
+        <button class="btn btn--primary" type="button" id="copy">Copy quote</button>
+        <button class="btn btn--ghost" type="button" id="link">Copy link</button>
+        <button class="btn btn--ghost" type="button" onclick="print()">Print</button>
+      </div>
+      <p class="fine" id="fine" role="status"></p>
+    </aside>
+  </main>
+
+  <footer class="wrap foot"><p>Private page. Prices are a guide until confirmed in writing.</p></footer>
+  <script type="module" src="./gate.js"></script>
+</body>
+</html>
