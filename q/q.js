@@ -149,7 +149,10 @@ function draw(q) {
       if (!res.ok) throw new Error('bad');
       go.hidden = true; form.querySelector('fieldset').disabled = true;
       const d = $('#done'); d.hidden = false;
-      d.textContent = `Thank you, ${name}. I have your choice and I will be in touch soon.`;
+      d.innerHTML = `<ol class="done__steps" aria-label="Where you are"><li class="is-done"><i aria-hidden="true"></i><span>Your quote</span></li><li class="is-done"><i aria-hidden="true"></i><span>Your choice</span></li><li><i aria-hidden="true"></i><span>Next steps</span></li></ol><b class="done__t"></b><span class="done__p"></span>`;
+      $('.done__t', d).textContent = `You have taken the second step, ${name}.`;
+      $('.done__p', d).textContent = 'I will reach out soon about next steps.';
+      d.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
     } catch {
       send.disabled = false; send.textContent = `Go with option ${o.k || 'AB'[picked]}`;
       line.textContent = 'That did not send. Please try again, or message me through simplybydaniel.com.';

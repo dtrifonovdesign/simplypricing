@@ -108,3 +108,14 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 .choice__lines li.is-out .tick__t, .choice__lines li.is-out .tick__p { color: var(--stone); text-decoration: line-through; }
 .choice__lines li.is-out .tick { cursor: default; }
 .choice__lines .tick__p { white-space: nowrap; }
+
+.done { display: grid; gap: 8px; }
+.done__t { font: 600 1.375rem/1.25 "Bricolage Grotesque", sans-serif; letter-spacing: -.01em; }
+.done__p { font: 400 1rem/1.5 "Figtree", sans-serif; color: var(--ink-soft); }
+.done__steps { list-style: none; margin: 0 0 8px; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; font: 500 .8125rem/1 "Figtree", sans-serif; }
+.done__steps li { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--line); color: var(--stone); }
+.done__steps li i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid currentColor; }
+.done__steps li.is-done { background: var(--ink); border-color: var(--ink); color: var(--cream); }
+.done__steps li.is-done i { background: var(--brass); border-color: var(--brass); }
+.done:not([hidden]) { animation: rise .6s var(--ease) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
