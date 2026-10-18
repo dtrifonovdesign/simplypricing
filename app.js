@@ -32,7 +32,12 @@ const state = {
 
 /* ---- the quote, worked out */
 const INCLUDED = { flagship: ['threeD', 'admin', 'store'] };
-const has = (o, k) => o[k] && !(INCLUDED[state.rx] || []).includes(k);
+const SITE_ONLY = ['threeD', 'admin', 'store'];                     // website extras: they make no sense on a brand-only or social-only package
+const unavailable = (k, id = state.rx) => (INCLUDED[id] || []).includes(k) || (!build(id).main && SITE_ONLY.includes(k));
+const has = (o, k) => o[k] && !unavailable(k);
+// the menu price: the package with every extra it does not already have. You take away what they do not need.
+const EXTRAS = ['threeD', 'admin', 'store', 'cards'];
+const full = (b) => b.price + (b.main ? EXTRAS.filter((k) => !unavailable(k, b.id)).reduce((n, k) => n + ADDONS[k].price, 0) : 0);
 function optionOf(i) {
   const o = state.opts[i], b = build(state.rx), c = care(o.care);
   const lines = [[b.name, b.price]];
@@ -67,9 +72,9 @@ async function payload() {
     v: 1, id: Math.random().toString(36).slice(2, 8).toUpperCase(),
     n: state.name.trim(), co: state.co.trim(), on: now.toISOString().slice(0, 10), vd: until.toISOString().slice(0, 10),
     why: state.why.trim() || reasonText(),
-    rx: { id: b.id, name: b.name, tag: b.tag, price: b.price, blurb: b.blurb, items: b.items },
-    menu: MAIN.map((m) => ({ id: m.id, name: m.name, price: m.price, blurb: m.blurb })),
-    un: b.id === TOP.id || !b.main ? null : { name: TOP.name, price: TOP.price, reason: state.unsell.trim() || unsellDefault() },
+    rx: { id: b.id, name: b.name, tag: b.tag, price: full(b), blurb: b.blurb, items: b.items },
+    menu: MAIN.map((m) => ({ id: m.id, name: m.name, price: full(m), blurb: m.blurb })),
+    un: b.id === TOP.id || !b.main ? null : { name: TOP.name, price: full(TOP), reason: state.unsell.trim() || unsellDefault() },
     steps: p ? p.steps.map((s) => [s.t, (s.d.match(/^.*?[.!?](s|$)/) || [s.d])[0].trim()]) : [],
     opts: [optionOf(0), optionOf(1)],
   };
@@ -97,7 +102,8 @@ const card = (b) => `
     ${b.popular ? '<span class="badge">Popular</span>' : ''}
     <span class="build__tag">${esc(b.tag)}</span>
     <span class="build__name">${esc(b.name)}</span>
-    <span class="build__price">${money(b.price)}</span>
+    <span class="build__price">${money(full(b))}</span>
+    ${b.main ? `<span class="build__base">${money(b.price)} package + extras</span>` : ''}
     <span class="build__blurb">${esc(b.blurb)}</span>
   </button>`;
 buildsEl.innerHTML = `<div class="builds__main">${MAIN.map(card).join('')}</div>
@@ -105,7 +111,7 @@ buildsEl.innerHTML = `<div class="builds__main">${MAIN.map(card).join('')}</div>
   <div class="builds__small">${BUILDS.filter((b) => !b.main).map(card).join('')}</div>`;
 buildsEl.addEventListener('click', (e) => {
   const el = e.target.closest('.build'); if (!el) return;
-  state.rx = el.dataset.id; state.whyManual = false; state.opts.forEach((o) => { o.threeD = o.admin = o.store = o.cards = true; }); render();
+  state.rx = el.dataset.id; state.whyManual = false; state.opts.forEach((o) => { const m = build(el.dataset.id).main; o.threeD = o.admin = o.store = o.cards = m; }); render();
 });
 
 /* ---- the two options */
@@ -184,7 +190,7 @@ async function render(keepFocusText) {
 
   const showUn = b.main && b.id !== TOP.id;
   $('#unsell-box').hidden = !showUn;
-  $('#unsell-line').textContent = `First they hear about ${TOP.name} (${money(TOP.price)}), and that they do not need it.`;
+  $('#unsell-line').textContent = `First they hear about ${TOP.name} (${money(full(TOP))}), and that they do not need it.`;
   $('#unsell-label').textContent = `What ${TOP.name} adds`;
 
   [0, 1].forEach((i) => {
@@ -194,7 +200,7 @@ async function render(keepFocusText) {
     const rec = $('[data-rec]', el); rec.hidden = !q.rec && !q.note;
     rec.textContent = q.rec ? `Then ${money(q.rec[0])} per ${q.rec[1]}` : q.note;
     $('select', el).value = o.care;
-    el.querySelectorAll('.tog').forEach((t) => { const inc = (INCLUDED[state.rx] || []).includes(t.dataset.k); t.closest('.row').hidden = inc; t.setAttribute('aria-checked', !!o[t.dataset.k]); });
+    el.querySelectorAll('.tog').forEach((t) => { const inc = unavailable(t.dataset.k); t.closest('.row').hidden = inc; t.setAttribute('aria-checked', !!o[t.dataset.k]); });
     el.querySelectorAll('.step').forEach((s) => { const k = $('button', s).dataset.k; $('output', s).textContent = o[k]; $('button', s).disabled = o[k] <= 0; });
   });
 

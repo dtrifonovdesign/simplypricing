@@ -200,3 +200,5 @@ a.btn { display: inline-block; text-decoration: none; }
 .recent button { padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(244, 238, 227, .3); background: transparent; color: var(--cream); font: 500 .75rem/1 "Figtree", sans-serif; cursor: pointer; }
 .sum .btn--ghost { border-color: rgba(244, 238, 227, .35); }
 @media print { .sum { display: none; } }
+
+.build__base { display: block; margin-top: 2px; font-size: .75rem; color: var(--stone); }
