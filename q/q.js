@@ -36,16 +36,18 @@ function draw(q) {
       <b>${esc(m.name)}</b><span class="pack__price">${money(m.price)}</span><span class="pack__blurb">${esc(m.blurb)}</span></li>`;
   };
   const optCard = (o, i) => `
-    <label class="choice">
+    <div class="choice">
       <input type="radio" name="opt" value="${i}" ${i === 0 ? '' : ''} />
       <span class="choice__in">
         <span class="choice__k">Option ${esc(o.k || 'AB'[i])}</span>
         <b class="choice__label">${esc(o.label)}</b>
-        <ul class="choice__lines">${(o.lines || []).map((l) => `<li><span>${esc(l[0])}</span><span>${money(l[1])}</span></li>`).join('')}</ul>
-        <span class="choice__total"><span>One time</span><b>${money(o.total)}</b></span>
+        <ul class="choice__lines">${(o.lines || []).map((l, k) => k === 0
+          ? `<li class="is-base"><span>${esc(l[0])}</span><span>${money(l[1])}</span></li>`
+          : `<li><label class="tick"><input type="checkbox" data-opt="${i}" data-line="${k}" checked /><i aria-hidden="true"></i><span class="tick__t">${esc(l[0])}</span></label><span class="tick__p">${money(l[1])}</span></li>`).join('')}</ul>
+        <span class="choice__total"><span>One time</span><b data-total="${i}">${money(o.total)}</b></span>
         ${Array.isArray(o.rec) ? `<span class="choice__rec">Then ${money(o.rec[0])} per ${esc(o.rec[1])}</span>` : o.note ? `<span class="choice__rec">${esc(o.note)}</span>` : ''}
       </span>
-    </label>`;
+    </div>`;
 
   main.innerHTML = `
     <section class="hero">
@@ -78,6 +80,7 @@ function draw(q) {
     <section class="sec" id="choose">
       <p class="eyebrow">3</p>
       <h2>Which would you rather?</h2>
+      <p class="say">Everything is selected. Untick anything you do not need.</p>
       <form class="choices" id="choices">
         <fieldset ${expired ? 'disabled' : ''}>
           <legend class="sr">Pick one option</legend>
@@ -98,14 +101,31 @@ function draw(q) {
 
   const form = $('#choices'), go = $('#go'), line = $('.go__line', go), send = $('#send');
   let picked = null;
-  form.addEventListener('change', (e) => {
-    const r = e.target.closest('input[name="opt"]'); if (!r) return;
-    picked = +r.value;
-    const o = q.opts[picked], start = Math.round(num(o.total) / 2);
+  const off = q.opts.map(() => new Set());
+  const totalOf = (i) => (q.opts[i].lines || []).reduce((n, l, k) => n + (off[i].has(k) ? 0 : num(l[1])), 0);
+  const refresh = () => {
+    q.opts.slice(0, 2).forEach((o, i) => { const el = form.querySelector('[data-total="' + i + '"]'); if (el) el.textContent = money(totalOf(i)); });
+    if (picked === null) return;
+    const o = q.opts[picked], start = Math.round(totalOf(picked) / 2);
     form.querySelectorAll('.choice').forEach((c, i) => c.classList.toggle('is-on', i === picked));
-    line.textContent = `${o.label}. ${money(start)} to start${Array.isArray(o.rec) ? `, then ${money(o.rec[0])} per ${o.rec[1]} after launch` : ''}.`;
+    line.textContent = `Option ${o.k || 'AB'[picked]}: ${money(start)} to start${Array.isArray(o.rec) ? `, then ${money(o.rec[0])} per ${o.rec[1]} after launch` : ''}.`;
     send.textContent = `Go with option ${o.k || 'AB'[picked]}`;
     go.hidden = false;
+  };
+  form.addEventListener('click', (e) => {
+    const c = e.target.closest('.choice'); if (!c || e.target.closest('.tick') || e.target.matches('input')) return;
+    c.querySelector('input[name="opt"]').click();
+  });
+  form.addEventListener('change', (e) => {
+    const t = e.target.closest('input[data-line]');
+    if (t) {
+      const i = +t.dataset.opt, k = +t.dataset.line;
+      t.checked ? off[i].delete(k) : off[i].add(k);
+      picked = i; form.querySelectorAll('input[name="opt"]')[i].checked = true;   // touching an option chooses it
+      return refresh();
+    }
+    const r = e.target.closest('input[name="opt"]'); if (!r) return;
+    picked = +r.value; refresh();
   });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -118,7 +138,7 @@ function draw(q) {
         body: JSON.stringify({
           _subject: `Quote ${q.id || ''}: ${name} chose option ${o.k || 'AB'[picked]}`, _template: 'table', _captcha: 'false',
           name, company: q.co || '', quote: q.id || '', package: rx.name, option: `${o.k || 'AB'[picked]}: ${o.label}`,
-          one_time_total: money(o.total), then: Array.isArray(o.rec) ? `${money(o.rec[0])} per ${o.rec[1]}` : 'none',
+          one_time_total: money(totalOf(picked)), left_out: (o.lines || []).filter((l, k) => off[picked].has(k)).map((l) => l[0]).join(', ') || 'nothing', then: Array.isArray(o.rec) ? `${money(o.rec[0])} per ${o.rec[1]}` : 'none',
         }),
       });
       if (!res.ok) throw new Error('bad');

@@ -91,3 +91,14 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media print { .go, .top__tag { display: none; } body { background: #fff; } }
+
+/* tick off what you do not need */
+.choice__lines li.is-base { padding-bottom: 4px; }
+.tick { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+.tick input { position: absolute; opacity: 0; pointer-events: none; }
+.tick i { flex: none; width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--ink-soft); background: transparent; position: relative; transition: background-color .2s var(--ease); }
+.tick input:checked + i { background: var(--ink); border-color: var(--ink); }
+.tick input:checked + i::after { content: ""; position: absolute; left: 4px; top: 4px; width: 8px; height: 4px; border-left: 2px solid var(--cream); border-bottom: 2px solid var(--cream); transform: rotate(-45deg); }
+.tick input:focus-visible + i { outline: 2px solid var(--ink); outline-offset: 2px; }
+.tick input:not(:checked) ~ .tick__t { color: var(--stone); text-decoration: line-through; }
+.choice__lines li:has(input:not(:checked)) .tick__p { color: var(--stone); text-decoration: line-through; }

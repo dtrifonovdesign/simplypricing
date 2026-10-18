@@ -25,22 +25,24 @@ const state = {
   name: '', co: '', days: 14, picks: new Set(), why: '', whyManual: false,
   rx: 'complete', unsell: '', unsellManual: false,
   opts: [
-    { care: 'quarter', admin: false, store: false, cards: false, threeD: false, pages: 0, rounds: 0 },
-    { care: 'month', admin: false, store: false, cards: false, threeD: false, pages: 0, rounds: 0 },
+    { care: 'quarter', admin: true, store: true, cards: true, threeD: true, pages: 0, rounds: 0 },
+    { care: 'month', admin: true, store: true, cards: true, threeD: true, pages: 0, rounds: 0 },
   ],
 };
 
 /* ---- the quote, worked out */
+const INCLUDED = { flagship: ['threeD', 'admin', 'store'] };
+const has = (o, k) => o[k] && !(INCLUDED[state.rx] || []).includes(k);
 function optionOf(i) {
   const o = state.opts[i], b = build(state.rx), c = care(o.care);
   const lines = [[b.name, b.price]];
   const add = (label, amount) => lines.push([label, amount]);
   if (o.pages) add(`${o.pages} extra page${o.pages > 1 ? 's' : ''}`, o.pages * ADDONS.page.price);
   if (o.rounds) add(`${o.rounds} extra round${o.rounds > 1 ? 's' : ''} of changes`, o.rounds * ADDONS.round.price);
-  if (o.threeD) add(ADDONS.threeD.name, ADDONS.threeD.price);
-  if (o.admin) add(ADDONS.admin.name, ADDONS.admin.price);
-  if (o.store) add(ADDONS.store.name, ADDONS.store.price);
-  if (o.cards) add(ADDONS.cards.name, ADDONS.cards.price);
+  if (has(o, 'threeD')) add(ADDONS.threeD.name, ADDONS.threeD.price);
+  if (has(o, 'admin')) add(ADDONS.admin.name, ADDONS.admin.price);
+  if (has(o, 'store')) add(ADDONS.store.name, ADDONS.store.price);
+  if (has(o, 'cards')) add(ADDONS.cards.name, ADDONS.cards.price);
   const total = lines.reduce((s, l) => s + l[1], 0);
   const extras = lines.length === 2 ? ` + ${lines[1][0].toLowerCase()}` : lines.length > 2 ? ` + ${lines.length - 1} extras` : '';
   const label = `${b.name}${extras}${c.id === 'none' ? '' : ' with ' + c.name.toLowerCase()}`;
@@ -103,7 +105,7 @@ buildsEl.innerHTML = `<div class="builds__main">${MAIN.map(card).join('')}</div>
   <div class="builds__small">${BUILDS.filter((b) => !b.main).map(card).join('')}</div>`;
 buildsEl.addEventListener('click', (e) => {
   const el = e.target.closest('.build'); if (!el) return;
-  state.rx = el.dataset.id; state.whyManual = false; render();
+  state.rx = el.dataset.id; state.whyManual = false; state.opts.forEach((o) => { o.threeD = o.admin = o.store = o.cards = true; }); render();
 });
 
 /* ---- the two options */
@@ -192,7 +194,7 @@ async function render(keepFocusText) {
     const rec = $('[data-rec]', el); rec.hidden = !q.rec && !q.note;
     rec.textContent = q.rec ? `Then ${money(q.rec[0])} per ${q.rec[1]}` : q.note;
     $('select', el).value = o.care;
-    el.querySelectorAll('.tog').forEach((t) => t.setAttribute('aria-checked', !!o[t.dataset.k]));
+    el.querySelectorAll('.tog').forEach((t) => { const inc = (INCLUDED[state.rx] || []).includes(t.dataset.k); t.closest('.row').hidden = inc; t.setAttribute('aria-checked', !!o[t.dataset.k]); });
     el.querySelectorAll('.step').forEach((s) => { const k = $('button', s).dataset.k; $('output', s).textContent = o[k]; $('button', s).disabled = o[k] <= 0; });
   });
 
