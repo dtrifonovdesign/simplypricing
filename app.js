@@ -25,8 +25,8 @@ const state = {
   name: '', co: '', days: 14, picks: new Set(), why: '', whyManual: false,
   rx: 'complete', unsell: '', unsellManual: false,
   opts: [
-    { care: 'quarter', admin: false, store: false, threeD: false, pages: 0, rounds: 0 },
-    { care: 'month', admin: false, store: false, threeD: false, pages: 0, rounds: 0 },
+    { care: 'quarter', admin: false, store: false, cards: false, threeD: false, pages: 0, rounds: 0 },
+    { care: 'month', admin: false, store: false, cards: false, threeD: false, pages: 0, rounds: 0 },
   ],
 };
 
@@ -40,8 +40,9 @@ function optionOf(i) {
   if (o.threeD) add(ADDONS.threeD.name, ADDONS.threeD.price);
   if (o.admin) add(ADDONS.admin.name, ADDONS.admin.price);
   if (o.store) add(ADDONS.store.name, ADDONS.store.price);
+  if (o.cards) add(ADDONS.cards.name, ADDONS.cards.price);
   const total = lines.reduce((s, l) => s + l[1], 0);
-  const extras = lines.length > 1 ? ` + ${lines.length - 1} extra${lines.length > 2 ? 's' : ''}` : '';
+  const extras = lines.length === 2 ? ` + ${lines[1][0].toLowerCase()}` : lines.length > 2 ? ` + ${lines.length - 1} extras` : '';
   const label = `${b.name}${extras}${c.id === 'none' ? '' : ' with ' + c.name.toLowerCase()}`;
   const rec = c.price ? [c.price, c.per] : null;
   return { k: 'AB'[i], label, lines, total, rec, note: c.note || '' };
@@ -122,6 +123,7 @@ optsEl.innerHTML = [0, 1].map((i) => `
     ${toggle(i, 'threeD', ADDONS.threeD.name, ADDONS.threeD.price)}
     ${toggle(i, 'admin', ADDONS.admin.name, ADDONS.admin.price)}
     ${toggle(i, 'store', ADDONS.store.name, ADDONS.store.price)}
+    ${toggle(i, 'cards', ADDONS.cards.name, ADDONS.cards.price)}
     ${stepper(i, 'pages', 'Extra pages', ADDONS.page.price)}
     ${stepper(i, 'rounds', 'Extra rounds', ADDONS.round.price)}
     <p class="opt__total"><span>One time</span><b data-total></b></p>
