@@ -26,7 +26,7 @@ section > h1 + *, section > h2 + * { margin-top: 20px; }
 
 /* builds */
 .builds__main { display: grid; gap: 12px; }
-@media (min-width: 640px) { .builds__main { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .builds__main { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .builds__small { display: grid; gap: 12px; }
 @media (min-width: 560px) { .builds__small { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .smalllabel { margin: 28px 0 12px; font-size: .875rem; color: var(--stone); }

@@ -34,7 +34,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 
 /* 1: the menu */
 .packs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-@media (min-width: 640px) { .packs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .packs { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }
 .pack { display: grid; gap: 4px; align-content: start; padding: 20px; border: 1.5px solid var(--line); border-radius: var(--r-md); transition: opacity .4s var(--ease); }
 .pack__tag { font-size: .6875rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--stone); min-height: 1em; }
 .pack b { font: 600 1.25rem/1.2 "Bricolage Grotesque", sans-serif; color: var(--ink); }
