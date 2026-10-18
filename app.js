@@ -1,187 +1,210 @@
+// The quote builder. Daniel's side only: pick who it is for, what they need, and two versions of it.
+// The result is a link to /q/, the page the client sees. Everything the client needs travels inside the link.
+import { encode } from './codec.js';
+
 const { BUILDS, ADDONS, CARE, PROCESS } = globalThis.__cfg;
 
-const $ = (s) => document.querySelector(s);
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = (n) => '$' + Math.round(n).toLocaleString('en-US');
-const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-const PACKAGES = new Set(['essentials', 'complete', 'signature', 'brand']);
+const MAIN = BUILDS.filter((b) => b.main);
+const TOP = MAIN.reduce((a, b) => (b.price > a.price ? b : a));
+const build = (id) => BUILDS.find((b) => b.id === id);
+const care = (id) => CARE.find((c) => c.id === id);
 
-// state lives in the URL hash so a quote can be shared as a link
-const state = { build: 'complete', rounds: 0, pages: 0, threeD: false, admin: false, store: false, care: 'none' };
-const readHash = () => {
-  const p = new URLSearchParams(location.hash.slice(1));
-  if (BUILDS.some((b) => b.id === p.get('b'))) state.build = p.get('b');
-  state.rounds = clamp(+p.get('r') || 0, 0, 10);
-  state.pages = clamp(+p.get('p') || 0, 0, 20);
-  state.threeD = p.get('d') === '1';
-  state.admin = p.get('m') === '1';
-  state.store = p.get('s') === '1';
-  if (CARE.some((c) => c.id === p.get('c'))) state.care = p.get('c');
+const SITUATIONS = [
+  ['brand', 'they already have a brand', 'you already have a brand'],
+  ['scratch', 'they are starting from scratch', "you're starting your brand from scratch"],
+  ['online', 'they need to sell online', 'you need to sell online'],
+  ['edit', 'they want to edit the site themselves', 'you want to edit the site yourself'],
+  ['local', 'they serve a local area', 'you serve a local area'],
+  ['social', 'their customers find them on social', 'your customers find you on social media'],
+];
+
+const state = {
+  name: '', co: '', days: 14, picks: new Set(), why: '', whyManual: false,
+  rx: 'complete', unsell: '', unsellManual: false,
+  opts: [
+    { care: 'quarter', admin: false, store: false, threeD: false, pages: 0, rounds: 0 },
+    { care: 'month', admin: false, store: false, threeD: false, pages: 0, rounds: 0 },
+  ],
 };
-const writeHash = () => {
-  const p = new URLSearchParams({ b: state.build, r: state.rounds, p: state.pages, d: +state.threeD, m: +state.admin, s: +state.store, c: state.care });
-  history.replaceState(null, '', '#' + p);
-};
 
-const build = () => BUILDS.find((b) => b.id === state.build);
+/* ---- the quote, worked out */
+function optionOf(i) {
+  const o = state.opts[i], b = build(state.rx), c = care(o.care);
+  const lines = [[b.name, b.price]];
+  const add = (label, amount) => lines.push([label, amount]);
+  if (o.pages) add(`${o.pages} extra page${o.pages > 1 ? 's' : ''}`, o.pages * ADDONS.page.price);
+  if (o.rounds) add(`${o.rounds} extra round${o.rounds > 1 ? 's' : ''} of changes`, o.rounds * ADDONS.round.price);
+  if (o.threeD) add(ADDONS.threeD.name, ADDONS.threeD.price);
+  if (o.admin) add(ADDONS.admin.name, ADDONS.admin.price);
+  if (o.store) add(ADDONS.store.name, ADDONS.store.price);
+  const total = lines.reduce((s, l) => s + l[1], 0);
+  const extras = lines.length > 1 ? ` + ${lines.length - 1} extra${lines.length > 2 ? 's' : ''}` : '';
+  const label = `${b.name}${extras}${c.id === 'none' ? '' : ' with ' + c.name.toLowerCase()}`;
+  const rec = c.price ? [c.price, c.per] : null;
+  return { k: 'AB'[i], label, lines, total, rec, note: c.note || '' };
+}
 
-/* ---- builds */
+function reasonText() {
+  const ph = SITUATIONS.filter(([id]) => state.picks.has(id)).map((s) => s[2]);
+  const b = build(state.rx);
+  if (!ph.length) return `${b.name} is the best setup for you.`;
+  const joined = ph.length === 1 ? ph[0] : ph.slice(0, -1).join(', ') + ' and ' + ph.at(-1);
+  return `Because ${joined}, ${b.name} is the best setup for you.`;
+}
+const unsellDefault = () => TOP.unsell || 'extras you will not use right now';
+
+async function payload() {
+  const b = build(state.rx);
+  const now = new Date(), until = new Date(now.getTime() + state.days * 864e5);
+  const p = PROCESS[b.id];
+  return {
+    v: 1, id: Math.random().toString(36).slice(2, 8).toUpperCase(),
+    n: state.name.trim(), co: state.co.trim(), on: now.toISOString().slice(0, 10), vd: until.toISOString().slice(0, 10),
+    why: state.why.trim() || reasonText(),
+    rx: { id: b.id, name: b.name, tag: b.tag, price: b.price, blurb: b.blurb, items: b.items },
+    menu: MAIN.map((m) => ({ id: m.id, name: m.name, price: m.price, blurb: m.blurb })),
+    un: b.id === TOP.id || !b.main ? null : { name: TOP.name, price: TOP.price, reason: state.unsell.trim() || unsellDefault() },
+    steps: p ? p.steps.map((s) => [s.t, (s.d.match(/^.*?[.!?](s|$)/) || [s.d])[0].trim()]) : [],
+    opts: [optionOf(0), optionOf(1)],
+  };
+}
+
+/* ---- who + situations */
+const chips = $('#situations');
+chips.innerHTML = SITUATIONS.map(([id, label]) => `<button class="chip" type="button" aria-pressed="false" data-id="${id}">${esc(label)}</button>`).join('');
+chips.addEventListener('click', (e) => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  const on = !state.picks.has(c.dataset.id);
+  on ? state.picks.add(c.dataset.id) : state.picks.delete(c.dataset.id);
+  state.whyManual = false; render();
+});
+$('#f-name').addEventListener('input', (e) => { state.name = e.target.value; render(); });
+$('#f-co').addEventListener('input', (e) => { state.co = e.target.value; render(); });
+$('#f-days').addEventListener('change', (e) => { state.days = +e.target.value; render(); });
+$('#f-why').addEventListener('input', (e) => { state.why = e.target.value; state.whyManual = true; render(true); });
+$('#f-unsell').addEventListener('input', (e) => { state.unsell = e.target.value; state.unsellManual = true; render(true); });
+
+/* ---- the packages */
 const buildsEl = $('#builds');
 const card = (b) => `
-  <div class="build${b.main ? '' : ' build--small'}" data-id="${b.id}">
+  <button class="build${b.main ? '' : ' build--small'}" type="button" role="radio" aria-checked="false" data-id="${b.id}">
     ${b.popular ? '<span class="badge">Popular</span>' : ''}
-    <button class="build__pick" type="button" role="radio" aria-checked="false" data-id="${b.id}">
-      <span class="build__tag">${b.tag}</span>
-      <span class="build__name">${b.name}</span>
-      <span class="build__price">${money(b.price)}</span>
-      <span class="build__blurb">${b.blurb}</span>
-    </button>
-    <div class="build__links"><button class="build__more" type="button" aria-expanded="false" aria-controls="inc-${b.id}">See more</button>
-    ${PROCESS[b.id] ? `<button class="build__more build__proc" type="button" data-proc="${b.id}">See the process</button>` : ''}</div>
-    <ul id="inc-${b.id}" hidden>${b.items.map((i) => `<li>${i}</li>`).join('')}</ul>
-  </div>`;
-buildsEl.innerHTML = `<div class="builds__main">${BUILDS.filter((b) => b.main).map(card).join('')}</div>
+    <span class="build__tag">${esc(b.tag)}</span>
+    <span class="build__name">${esc(b.name)}</span>
+    <span class="build__price">${money(b.price)}</span>
+    <span class="build__blurb">${esc(b.blurb)}</span>
+  </button>`;
+buildsEl.innerHTML = `<div class="builds__main">${MAIN.map(card).join('')}</div>
   <p class="smalllabel">Or something smaller</p>
   <div class="builds__small">${BUILDS.filter((b) => !b.main).map(card).join('')}</div>`;
 buildsEl.addEventListener('click', (e) => {
-  const pr = e.target.closest('[data-proc]');
-  if (pr) return openProcess(pr.dataset.proc, pr);
-  const more = e.target.closest('.build__more');
-  if (more) {
-    const open = more.getAttribute('aria-expanded') !== 'true';
-    more.setAttribute('aria-expanded', open); more.textContent = open ? 'See less' : 'See more';
-    $('#inc-' + more.closest('.build').dataset.id).hidden = !open;
-    return;
-  }
-  const el = e.target.closest('.build__pick'); if (!el) return;
-  state.build = el.dataset.id; render();
-});
-buildsEl.addEventListener('keydown', (e) => {
-  if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) return;
-  e.preventDefault();
-  const i = BUILDS.findIndex((b) => b.id === state.build), n = BUILDS.length;
-  state.build = BUILDS[(i + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : n - 1)) % n].id;
-  render(); buildsEl.querySelector(`.build__pick[data-id="${state.build}"]`).focus();
+  const el = e.target.closest('.build'); if (!el) return;
+  state.rx = el.dataset.id; state.whyManual = false; render();
 });
 
-/* ---- process panel */
-const dlg = document.createElement('dialog');
-dlg.className = 'proc';
-dlg.setAttribute('aria-labelledby', 'proc-title');
-dlg.innerHTML = '<div class="proc__in"><button class="proc__x" type="button" aria-label="Close">×</button><p class="eyebrow" id="proc-eyebrow"></p><h2 id="proc-title"></h2><p class="proc__intro" id="proc-intro"></p><ol class="proc__list" id="proc-list"></ol><h3 class="proc__h">After launch</h3><ul class="proc__after" id="proc-after"></ul></div>';
-document.body.append(dlg);
-let procOpener = null;
-function openProcess(id, opener) {
-  const p = PROCESS[id], b = BUILDS.find((x) => x.id === id); if (!p) return;
-  procOpener = opener || null;
-  $('#proc-eyebrow').textContent = 'The process';
-  $('#proc-title').textContent = b.name;
-  $('#proc-intro').textContent = p.intro;
-  const li = (txt) => Object.assign(document.createElement('li'), { textContent: txt });
-  const list = $('#proc-list'); list.replaceChildren();
-  p.steps.forEach((s) => {
-    const el = document.createElement('li'), h = document.createElement('h3'), d = document.createElement('p');
-    h.textContent = s.t; d.textContent = s.d; el.append(h, d);
-    [['You get', s.gets], ['Done when', s.done]].forEach(([k, v]) => { if (!v) return; const m = document.createElement('p'); m.className = 'proc__m'; const bb = document.createElement('b'); bb.textContent = k + ': '; m.append(bb, v); el.append(m); });
-    list.append(el);
-  });
-  $('#proc-after').replaceChildren(...p.after.map(li));
-  dlg.showModal(); dlg.scrollTop = 0; dlg.querySelector('.proc__in').scrollTop = 0;
-}
-dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('.proc__x')) dlg.close(); });
-dlg.addEventListener('close', () => { if (procOpener) procOpener.focus(); });
-$('#proc-link').addEventListener('click', (e) => openProcess(state.build, e.currentTarget));
-
-/* ---- add-ons */
-const addonsEl = $('#addons');
-addonsEl.innerHTML = `
-  <div class="row" id="row-round"><div><b>${ADDONS.round.name}</b><small id="s-round"></small></div><div class="step" data-k="rounds"><button type="button" aria-label="Fewer rounds" data-d="-1">−</button><output>0</output><button type="button" aria-label="More rounds" data-d="1">+</button></div></div>
-  <div class="row" id="row-page"><div><b>${ADDONS.page.name}</b><small id="s-page"></small></div><div class="step" data-k="pages"><button type="button" aria-label="Fewer pages" data-d="-1">−</button><output>0</output><button type="button" aria-label="More pages" data-d="1">+</button></div></div>
-  <div class="row" id="row-3d"><div><b>${ADDONS.threeD.name}</b><small>Scroll-driven 3D or an interactive hero, like simplybydaniel.com. +${money(ADDONS.threeD.price)}</small></div><button class="tog" type="button" role="switch" aria-label="${ADDONS.threeD.name}" data-k="threeD" aria-checked="false"></button></div>
-  <div class="row" id="row-admin"><div><b>${ADDONS.admin.name}</b><small>A private page to log in and edit the site's details. +${money(ADDONS.admin.price)}</small></div><button class="tog" type="button" role="switch" aria-label="${ADDONS.admin.name}" data-k="admin" aria-checked="false"></button></div>
-  <div class="row" id="row-store"><div><b>${ADDONS.store.name}</b><small>Sell products and take payments on the site. +${money(ADDONS.store.price)}</small></div><button class="tog" type="button" role="switch" aria-label="${ADDONS.store.name}" data-k="store" aria-checked="false"></button></div>`;
-addonsEl.addEventListener('click', (e) => {
-  const st = e.target.closest('.step button');
-  if (st) { const k = st.parentElement.dataset.k; state[k] = clamp(state[k] + +st.dataset.d, 0, k === 'rounds' ? 10 : 20); return render(); }
-  const tg = e.target.closest('.tog');
-  if (tg) { state[tg.dataset.k] = !state[tg.dataset.k]; render(); }
+/* ---- the two options */
+const optsEl = $('#opts');
+const stepper = (i, key, label, price) => `
+  <div class="row row--sm"><div><b>${label}</b><small>${money(price)} each</small></div>
+    <div class="step"><button type="button" data-i="${i}" data-k="${key}" data-d="-1" aria-label="Fewer: ${label}">−</button><output>0</output><button type="button" data-i="${i}" data-k="${key}" data-d="1" aria-label="More: ${label}">+</button></div></div>`;
+const toggle = (i, key, label, price) => `
+  <div class="row row--sm"><div><b>${label}</b><small>${money(price)}</small></div>
+    <button class="tog" type="button" role="switch" aria-checked="false" aria-label="${label}" data-i="${i}" data-k="${key}"></button></div>`;
+optsEl.innerHTML = [0, 1].map((i) => `
+  <div class="opt" data-i="${i}">
+    <p class="eyebrow">Option ${'AB'[i]}</p>
+    <p class="opt__label" data-label></p>
+    <label class="field field--wide"><span>After launch</span>
+      <select data-i="${i}" data-k="care">${CARE.map((c) => `<option value="${c.id}">${esc(c.name)}${c.price ? ' · ' + money(c.price) + ' / ' + c.per : ''}</option>`).join('')}</select></label>
+    ${toggle(i, 'threeD', ADDONS.threeD.name, ADDONS.threeD.price)}
+    ${toggle(i, 'admin', ADDONS.admin.name, ADDONS.admin.price)}
+    ${toggle(i, 'store', ADDONS.store.name, ADDONS.store.price)}
+    ${stepper(i, 'pages', 'Extra pages', ADDONS.page.price)}
+    ${stepper(i, 'rounds', 'Extra rounds', ADDONS.round.price)}
+    <p class="opt__total"><span>One time</span><b data-total></b></p>
+    <p class="opt__rec" data-rec hidden></p>
+  </div>`).join('');
+optsEl.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-k]'); if (!t || t.tagName === 'SELECT') return;
+  const o = state.opts[+t.dataset.i], k = t.dataset.k;
+  if (t.dataset.d) o[k] = Math.min(20, Math.max(0, o[k] + +t.dataset.d)); else o[k] = !o[k];
+  render();
 });
+optsEl.addEventListener('change', (e) => { const s = e.target.closest('select[data-k]'); if (!s) return; state.opts[+s.dataset.i].care = s.value; render(); });
 
-/* ---- care */
-const careEl = $('#care');
-careEl.innerHTML = CARE.map((c) => `<button class="chip" type="button" role="radio" data-id="${c.id}" aria-checked="false">${c.name}${c.price ? ` · ${money(c.price)}/${c.per === 'quarter' ? 'qtr' : 'mo'}` : ''}</button>`).join('');
-careEl.addEventListener('click', (e) => { const el = e.target.closest('.chip'); if (el) { state.care = el.dataset.id; render(); } });
-
-/* ---- quote maths */
-function quote() {
-  const b = build(), lines = [];
-  let total = 0;
-  const add = (label, amt, cls = '') => { lines.push({ label, amt, cls }); total += amt; };
-  add(b.name, b.price);
-  if (PACKAGES.has(b.id) && state.rounds) add(`${state.rounds} extra round${state.rounds > 1 ? 's' : ''}`, state.rounds * ADDONS.round.price);
-  if (b.pages && state.pages) add(`${state.pages} extra page${state.pages > 1 ? 's' : ''}`, state.pages * ADDONS.page.price);
-  if (b.pages && state.threeD) add(ADDONS.threeD.name, ADDONS.threeD.price);
-  if (b.pages && state.admin) add(ADDONS.admin.name, ADDONS.admin.price);
-  if (b.pages && state.store) add(ADDONS.store.name, ADDONS.store.price);
-  const care = CARE.find((c) => c.id === state.care);
-  return { b, lines, total, care };
-}
-
-function render() {
-  const b = build();
-  // reset add-ons that don't apply to the chosen build
-  if (!PACKAGES.has(b.id)) { state.rounds = 0; }
-  if (!b.pages) { state.pages = 0; state.threeD = false; state.admin = false; state.store = false; }
-
-  buildsEl.querySelectorAll('.build').forEach((el) => { const on = el.dataset.id === state.build, p = el.querySelector('.build__pick'); el.classList.toggle('is-on', on); p.setAttribute('aria-checked', on); p.tabIndex = on ? 0 : -1; });
-  careEl.querySelectorAll('.chip').forEach((el) => { el.setAttribute('aria-checked', el.dataset.id === state.care); el.tabIndex = el.dataset.id === state.care ? 0 : -1; });
-
-  $('#row-round').hidden = !PACKAGES.has(b.id);
-  $('#row-page').hidden = !b.pages;
-  $('#row-3d').hidden = !b.pages;
-  $('#row-admin').hidden = !b.pages;
-  $('#row-store').hidden = !b.pages;
-  $('#s-round').textContent = `${money(ADDONS.round.price)} each. ${b.rounds} included.`;
-  $('#s-page').textContent = `${money(ADDONS.page.price)} each, past the ${b.pages} included.`;
-  addonsEl.querySelector('[data-k="rounds"] output').textContent = state.rounds;
-  addonsEl.querySelector('[data-k="pages"] output').textContent = state.pages;
-  addonsEl.querySelectorAll('.step').forEach((s) => { const k = s.dataset.k; s.querySelector('[data-d="-1"]').disabled = state[k] <= 0; s.querySelector('[data-d="1"]').disabled = state[k] >= (k === 'rounds' ? 10 : 20); });
-  addonsEl.querySelectorAll('.tog').forEach((t) => t.setAttribute('aria-checked', !!state[t.dataset.k]));
-  $('#sec-add').hidden = !(PACKAGES.has(b.id) || b.pages);
-
-  const q = quote();
-  $('#lines').innerHTML = q.lines.map((l) => `<li class="${l.cls}"><span>${l.label}</span><span>${l.amt < 0 ? '−' : ''}${money(Math.abs(l.amt))}</span></li>`).join('');
-  $('#total').textContent = money(q.total);
-  const rec = q.care.price > 0;
-  $('#rec-row').hidden = !rec;
-  if (rec) { $('#rec-label').textContent = `Then, per ${q.care.per}`; $('#rec').textContent = money(q.care.price); }
-  $('#care-note').textContent = q.care.note;
-  $('#proc-link').hidden = !PROCESS[state.build];
-  $('#proc-link').textContent = 'See how ' + b.name + ' works';
-
-  const meta = [];
-  const rounds = b.rounds ? b.rounds + state.rounds : 0, pages = b.pages ? b.pages + state.pages : 0;
-  if (rounds) meta.push(`${rounds} rounds of changes`);
-  if (pages) meta.push(`Website: up to ${pages} pages`);
-  if (b.guide) meta.push(`Brand guide: ${b.guide}`);
-  if (b.support) meta.push(`Support after launch: ${b.support}`);
-  $('#meta').innerHTML = meta.map((m) => `<span>${m}</span>`).join('');
-  writeHash();
-}
-
-/* ---- copy / print */
+/* ---- link, copy, recent */
+let link = '';
+const origin = () => (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? location.origin : 'https://pricing.simplybydaniel.com');
 const fine = $('#fine');
-const say = (t) => { fine.textContent = t; clearTimeout(say.t); say.t = setTimeout(() => (fine.textContent = ''), 2500); };
-const copy = async (text, ok) => {
-  try { await navigator.clipboard.writeText(text); say(ok); }
-  catch { const ta = Object.assign(document.createElement('textarea'), { value: text }); document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); say(ok); }
-};
-$('#copy').addEventListener('click', () => {
-  const q = quote();
-  const txt = ['Simply by Daniel, quote', '', ...q.lines.map((l) => `${l.label}: ${l.amt < 0 ? '-' : ''}${money(Math.abs(l.amt))}`), '', `Total: ${money(q.total)}`, q.care.price ? `Then ${money(q.care.price)} per ${q.care.per} (${q.care.name})` : q.care.id === 'update' ? q.care.note : ''].filter((x, i, a) => x || (a[i - 1] && a[i + 1])).join('\n');
-  copy(txt, 'Quote copied.');
-});
-$('#link').addEventListener('click', () => copy(location.href, 'Link copied.'));
+const say = (m) => { fine.textContent = m; clearTimeout(say.t); say.t = setTimeout(() => { fine.textContent = ''; }, 2600); };
+async function copy(text, done) {
+  try { await navigator.clipboard.writeText(text); say(done); }
+  catch { const ta = Object.assign(document.createElement('textarea'), { value: text }); document.body.append(ta); ta.select(); try { document.execCommand('copy'); say(done); } catch { say('Select and copy the link manually.'); } ta.remove(); }
+}
+const ready = () => state.name.trim().length > 0 && link;
+$('#copy-link').addEventListener('click', () => { if (!ready()) return say('Add a first name first.'); copy(link, 'Link copied.'); remember(); });
+$('#copy-msg').addEventListener('click', () => { if (!ready()) return say('Add a first name first.'); copy(`Hi ${state.name.trim()}, here is your personalised quote: ${link}`, 'Message copied.'); remember(); });
+$('#open-link').addEventListener('click', (e) => { if (!ready()) { e.preventDefault(); say('Add a first name first.'); } });
 
-$('#print-date').textContent = 'Quote, ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-readHash();
+const RKEY = 'simply-quotes';
+const recents = () => { try { return JSON.parse(localStorage.getItem(RKEY) || '[]'); } catch { return []; } };
+function remember() {
+  const list = recents().filter((r) => r.link !== link);
+  list.unshift({ name: state.name.trim(), co: state.co.trim(), at: new Date().toISOString().slice(0, 10), link });
+  try { localStorage.setItem(RKEY, JSON.stringify(list.slice(0, 10))); } catch { /* fine */ }
+  drawRecent();
+}
+function drawRecent() {
+  const list = recents();
+  $('#recent-box').hidden = !list.length;
+  $('#recent').innerHTML = list.map((r, i) => `<li><a href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.name)}${r.co ? ' · ' + esc(r.co) : ''}</a><span>${esc(r.at)}</span><button type="button" data-copy="${i}">Copy</button></li>`).join('');
+}
+$('#recent').addEventListener('click', (e) => { const b = e.target.closest('[data-copy]'); if (b) copy(recents()[+b.dataset.copy].link, 'Link copied.'); });
+drawRecent();
+
+/* ---- draw */
+let seq = 0;
+async function render(keepFocusText) {
+  const b = build(state.rx);
+  // the written reason follows the choices until Daniel types his own
+  if (!state.whyManual) state.why = reasonText();
+  if (!state.unsellManual) state.unsell = unsellDefault();
+  const why = $('#f-why'); if (!keepFocusText || why !== document.activeElement) why.value = state.why;
+  const un = $('#f-unsell'); if (!keepFocusText || un !== document.activeElement) un.value = state.unsell;
+
+  chips.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', state.picks.has(c.dataset.id)));
+  buildsEl.querySelectorAll('.build').forEach((el) => { const on = el.dataset.id === state.rx; el.classList.toggle('is-on', on); el.setAttribute('aria-checked', on); el.tabIndex = on ? 0 : -1; });
+
+  const showUn = b.main && b.id !== TOP.id;
+  $('#unsell-box').hidden = !showUn;
+  $('#unsell-line').textContent = `First they hear about ${TOP.name} (${money(TOP.price)}), and that they do not need it.`;
+  $('#unsell-label').textContent = `What ${TOP.name} adds`;
+
+  [0, 1].forEach((i) => {
+    const el = $(`.opt[data-i="${i}"]`), o = state.opts[i], q = optionOf(i);
+    $('[data-label]', el).textContent = q.label;
+    $('[data-total]', el).textContent = money(q.total);
+    const rec = $('[data-rec]', el); rec.hidden = !q.rec && !q.note;
+    rec.textContent = q.rec ? `Then ${money(q.rec[0])} per ${q.rec[1]}` : q.note;
+    $('select', el).value = o.care;
+    el.querySelectorAll('.tog').forEach((t) => t.setAttribute('aria-checked', !!o[t.dataset.k]));
+    el.querySelectorAll('.step').forEach((s) => { const k = $('button', s).dataset.k; $('output', s).textContent = o[k]; $('button', s).disabled = o[k] <= 0; });
+  });
+
+  // the sidebar
+  const who = state.name.trim();
+  $('#sum-who').textContent = who ? `${who}${state.co.trim() ? ' · ' + state.co.trim() : ''}` : 'Add a first name to begin.';
+  $('#lines').innerHTML = [0, 1].map((i) => { const q = optionOf(i); return `<li><span>Option ${q.k}: ${esc(q.label)}</span><b>${money(q.total)}</b></li>`; }).join('');
+  const my = ++seq;
+  const hash = await encode(await payload());
+  if (my !== seq) return;
+  link = `${origin()}/q/#${hash}`;
+  $('#open-link').href = link;
+  $('#open-link').classList.toggle('is-off', !who);
+  $('#copy-link').classList.toggle('is-off', !who);
+  $('#copy-msg').classList.toggle('is-off', !who);
+}
 render();
