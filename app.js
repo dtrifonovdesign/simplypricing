@@ -42,17 +42,19 @@ const full = (b) => b.price;                       // the price on the menu alre
 const base = (b) => b.price - extrasIn(b);         // what is left when every extra is switched off
 function optionOf(i) {
   const o = state.opts[i], b = build(state.rx), c = care(o.care);
-  const lines = [[b.name, base(b)]];
-  const add = (label, amount) => lines.push([label, amount]);
-  if (o.pages) add(`${o.pages} extra page${o.pages > 1 ? 's' : ''}`, o.pages * ADDONS.page.price);
-  if (o.rounds) add(`${o.rounds} extra round${o.rounds > 1 ? 's' : ''} of changes`, o.rounds * ADDONS.round.price);
-  if (has(o, 'threeD')) add(ADDONS.threeD.name, ADDONS.threeD.price);
-  if (has(o, 'admin')) add(ADDONS.admin.name, ADDONS.admin.price);
-  if (has(o, 'store')) add(ADDONS.store.name, ADDONS.store.price);
-  if (has(o, 'cards')) add(ADDONS.cards.name, ADDONS.cards.price);
-  const total = lines.reduce((s, l) => s + l[1], 0);
-  const extras = lines.length === 2 ? ` + ${lines[1][0].toLowerCase()}` : lines.length > 2 ? ` + ${lines.length - 1} extras` : '';
-  const label = `${b.name}${extras}${c.id === 'none' ? '' : ' with ' + c.name.toLowerCase()}`;
+  // kinds: pkg = the package at its all-in price, in = an element that comes with it, out = an element taken away, add = something added on top
+  const lines = [[b.name, b.price, 'pkg']];
+  EXTRAS.forEach((k) => {
+    if (INCLUDED[b.id]?.includes(k) || (!b.main && SITE_ONLY.includes(k))) return;   // not part of this package
+    if (b.main) lines.push([ADDONS[k].name, ADDONS[k].price, o[k] ? 'in' : 'out']);
+    else if (o[k]) lines.push([ADDONS[k].name, ADDONS[k].price, 'add']);
+  });
+  if (o.pages) lines.push([`${o.pages} more page${o.pages > 1 ? 's' : ''}`, o.pages * ADDONS.page.price, 'add']);
+  if (o.rounds) lines.push([`${o.rounds} more round${o.rounds > 1 ? 's' : ''} of changes`, o.rounds * ADDONS.round.price, 'add']);
+  const total = lines.reduce((s, l) => s + (l[2] === 'out' ? -l[1] : l[2] === 'in' ? 0 : l[1]), 0);
+  const out = lines.filter((l) => l[2] === 'out').map((l) => l[0].toLowerCase());
+  const without = out.length === 1 ? ` without ${out[0]}` : out.length > 1 ? ` without ${out.length} elements` : '';
+  const label = `${b.name}${without}${c.id === 'none' ? '' : (without ? ', with ' : ' with ') + c.name.toLowerCase()}`;
   const rec = c.price ? [c.price, c.per] : null;
   return { k: 'AB'[i], label, lines, total, rec, note: c.note || '' };
 }
@@ -121,7 +123,7 @@ const stepper = (i, key, label, price) => `
   <div class="row row--sm"><div><b>${label}</b><small>${money(price)} each</small></div>
     <div class="step"><button type="button" data-i="${i}" data-k="${key}" data-d="-1" aria-label="Fewer: ${label}">−</button><output>0</output><button type="button" data-i="${i}" data-k="${key}" data-d="1" aria-label="More: ${label}">+</button></div></div>`;
 const toggle = (i, key, label, price) => `
-  <div class="row row--sm"><div><b>${label}</b><small>${money(price)}</small></div>
+  <div class="row row--sm"><div><b>${label}</b><small>${money(price)} comes off if switched off</small></div>
     <button class="tog" type="button" role="switch" aria-checked="false" aria-label="${label}" data-i="${i}" data-k="${key}"></button></div>`;
 optsEl.innerHTML = [0, 1].map((i) => `
   <div class="opt" data-i="${i}">
@@ -133,8 +135,8 @@ optsEl.innerHTML = [0, 1].map((i) => `
     ${toggle(i, 'admin', ADDONS.admin.name, ADDONS.admin.price)}
     ${toggle(i, 'store', ADDONS.store.name, ADDONS.store.price)}
     ${toggle(i, 'cards', ADDONS.cards.name, ADDONS.cards.price)}
-    ${stepper(i, 'pages', 'Extra pages', ADDONS.page.price)}
-    ${stepper(i, 'rounds', 'Extra rounds', ADDONS.round.price)}
+    ${stepper(i, 'pages', 'More pages', ADDONS.page.price)}
+    ${stepper(i, 'rounds', 'More rounds', ADDONS.round.price)}
     <p class="opt__total"><span>One time</span><b data-total></b></p>
     <p class="opt__rec" data-rec hidden></p>
   </div>`).join('');
