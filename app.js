@@ -37,10 +37,12 @@ const unavailable = (k, id = state.rx) => (INCLUDED[id] || []).includes(k) || (!
 const has = (o, k) => o[k] && !unavailable(k);
 // the menu price: the package with every extra it does not already have. You take away what they do not need.
 const EXTRAS = ['threeD', 'admin', 'store', 'cards'];
-const full = (b) => b.price + (b.main ? EXTRAS.filter((k) => !unavailable(k, b.id)).reduce((n, k) => n + ADDONS[k].price, 0) : 0);
+const extrasIn = (b) => (b.main ? EXTRAS.filter((k) => !unavailable(k, b.id)).reduce((n, k) => n + ADDONS[k].price, 0) : 0);
+const full = (b) => b.price;                       // the price on the menu already has every extra in it
+const base = (b) => b.price - extrasIn(b);         // what is left when every extra is switched off
 function optionOf(i) {
   const o = state.opts[i], b = build(state.rx), c = care(o.care);
-  const lines = [[b.name, b.price]];
+  const lines = [[b.name, base(b)]];
   const add = (label, amount) => lines.push([label, amount]);
   if (o.pages) add(`${o.pages} extra page${o.pages > 1 ? 's' : ''}`, o.pages * ADDONS.page.price);
   if (o.rounds) add(`${o.rounds} extra round${o.rounds > 1 ? 's' : ''} of changes`, o.rounds * ADDONS.round.price);
@@ -103,7 +105,6 @@ const card = (b) => `
     <span class="build__tag">${esc(b.tag)}</span>
     <span class="build__name">${esc(b.name)}</span>
     <span class="build__price">${money(full(b))}</span>
-    ${b.main ? `<span class="build__base">${money(b.price)} package + extras</span>` : ''}
     <span class="build__blurb">${esc(b.blurb)}</span>
   </button>`;
 buildsEl.innerHTML = `<div class="builds__main">${MAIN.map(card).join('')}</div>

@@ -33,7 +33,7 @@ function draw(q) {
     const isRx = m.id === rx.id, isUn = un && m.name === un.name;
     return `<li class="pack${isRx ? ' is-rx' : ''}${isUn ? ' is-skip' : ''}">
       <span class="pack__tag">${isUn ? 'Not for you right now' : isRx ? 'Right for you' : '&nbsp;'}</span>
-      <b>${esc(m.name)}</b><span class="pack__price">${money(m.price)}</span><span class="pack__all">with everything</span><span class="pack__blurb">${esc(m.blurb)}</span></li>`;
+      <b>${esc(m.name)}</b><span class="pack__price">${money(m.price)}</span><span class="pack__blurb">${esc(m.blurb)}</span></li>`;
   };
   const optCard = (o, i) => `
     <div class="choice">
@@ -70,7 +70,7 @@ function draw(q) {
       <p class="say say--big">${esc(q.why || '')}</p>
       <div class="rx">
         <p class="rx__tag">${esc(rx.tag || '')}</p>
-        <h3>${esc(rx.name)} <span>${money(rx.price)} with everything</span></h3>
+        <h3>${esc(rx.name)} <span>${money(rx.price)}</span></h3>
         <p>${esc(rx.blurb || '')}</p>
         <ul>${(rx.items || []).map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
       </div>
